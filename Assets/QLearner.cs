@@ -10,9 +10,9 @@ public class QLearner : MonoBehaviour
 {
     public AgentMover AgentMover;
 
-    [Header("Hyperparameters")]
-    [Range(0.05f, 100f)]
+    [Header("Hyperparameters")] [Range(0.05f, 100f)]
     public float TimeScale = 100f;
+
     public float ExplorationFactor = 1f;
     public float LearningRate = 1f;
     public float DiscountFactor = 0.9f;
@@ -37,7 +37,7 @@ public class QLearner : MonoBehaviour
         QTable = new Dictionary<State, float[]>();
 
         int size = ArenaScaler.instance.Size;
-        
+
         for (int x = -size; x <= size; x++)
         {
             for (int y = -size; y <= size; y++)
@@ -59,14 +59,11 @@ public class QLearner : MonoBehaviour
 
     private void FixedUpdate()
     {
-        Time.timeScale = TimeScale;
-        
-        if (ExplorationFactor > 0.001f) ExplorationFactor  -= 1 / MaxStepCount;
-        if(LearningRate > 0.1f) LearningRate -= 1 / MaxStepCount;
-        if(DiscountFactor > 0.1f) DiscountFactor -= 1 / MaxStepCount;
-
         OnStep?.Invoke();
-        
+        Time.timeScale = TimeScale;
+
+        DecayHyperparameters();
+
         int action;
 
         if (Random.Range(0f, 1f) < ExplorationFactor)
@@ -79,18 +76,23 @@ public class QLearner : MonoBehaviour
         }
 
         var envResult = AgentMover.Move(action);
-        if(envResult.reward == 1) OnEpisodeComplete?.Invoke();
+        if (envResult.reward == 1) OnEpisodeComplete?.Invoke();
 
-        float oldQValue = 0;
+
+        float oldQValue = QTable[currentState][action];
         
-        oldQValue = QTable[currentState][action];
-
-
         var nextMax = QTable[envResult.state].Max();
 
         var newQValue = oldQValue + LearningRate * (envResult.reward + DiscountFactor * nextMax - oldQValue);
         QTable[currentState][action] = newQValue;
 
         currentState = envResult.state;
+    }
+
+    private void DecayHyperparameters()
+    {
+        if (ExplorationFactor > 0.001f) ExplorationFactor -= 1 / MaxStepCount;
+        if (LearningRate > 0.1f) LearningRate -= 1 / MaxStepCount;
+        if (DiscountFactor > 0.1f) DiscountFactor -= 1 / MaxStepCount;
     }
 }
